@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -20,8 +21,14 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		conn.Write([]byte("SET Foo Bar 10000000000"))
 
-		conn.Write([]byte("SET Foo Bar 1000"))
+		time.Sleep(time.Second * 2)
+		conn.Write([]byte("GET Foo"))
+		buf := make([]byte, 1000)
+		n, _ := conn.Read(buf)
+		fmt.Println("Read - ", string(buf[:n]))
+
 	}()
 
 	server := NewServer(opts, cache.New())

@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -21,6 +22,7 @@ func (c *Cache) Set(key, value []byte, ttl time.Duration) error {
 	defer c.lock.Unlock()
 
 	c.data[string(key)] = value
+	log.Printf("cache: SET %s to %s with TTL %s\n", string(key), string(value), ttl)
 
 	go func() {
 		<-time.After(ttl)
@@ -35,11 +37,13 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	defer c.lock.RUnlock()
 
 	keyStr := string(key)
+	log.Printf("cache: looking for key [%s]", string(key))
 
 	val, ok := c.data[keyStr]
 	if !ok {
 		return nil, fmt.Errorf("key (%s) not found", keyStr)
 	}
+	log.Printf("cache: got value %s for key %s", string(val), string(key))
 
 	return val, nil
 }

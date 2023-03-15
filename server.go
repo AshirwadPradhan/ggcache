@@ -29,14 +29,14 @@ func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
-		return fmt.Errorf("listen error: %s", err)
+		return fmt.Errorf("main: listen error: %s", err)
 	}
-	log.Printf("server starting on port [%s]\n", s.ListenAddr)
+	log.Printf("main: server starting on port [%s]\n", s.ListenAddr)
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf("accept error: %s\n", err)
+			log.Printf("server: accept error: %s\n", err)
 			continue
 		}
 		go s.handleConn(conn)
@@ -53,7 +53,7 @@ func (s *Server) handleConn(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			log.Printf("conn read error: %s\n", err)
+			log.Printf("server: conn read error: %s\n", err)
 			break
 		}
 		go s.handleCommand(conn, buf[:n])
@@ -63,16 +63,22 @@ func (s *Server) handleConn(conn net.Conn) {
 func (s *Server) handleCommand(conn net.Conn, rawCmd []byte) {
 	msg, err := s.parseMessage(rawCmd)
 	if err != nil {
-		fmt.Printf("failed to parse command %s : %s", string(rawCmd), err)
+		fmt.Printf("server: failed to parse command %s : %s", string(rawCmd), err)
+		conn.Write([]byte(err.Error()))
 		return
 	}
 
 	switch msg.Cmd {
 	case CMDSet:
-		if err := s.handleSetCommand(conn, msg); err != nil {
-			log.Printf("value not set [%s]\n", err)
-			return
-		}
+		err = s.handleSetCommand(conn, msg)
+	case CMDGet:
+		err = s.handleGetCommmand(conn, msg)
+	}
+
+	if err != nil {
+		log.Printf("server: failed to handle command [%s]: %s", string(rawCmd), err)
+		conn.Write([]byte(err.Error()))
+		return
 	}
 }
 
@@ -86,6 +92,17 @@ func (s *Server) handleSetCommand(conn net.Conn, msg *Message) error {
 	return nil
 }
 
-func (s *Server) sendToFollowers(ctx context.Context, msg *Message ) error {
+func (s *Server) handleGetCommmand(conn net.Conn, msg *Message) error {
+	val, err := s.cache.Get(msg.Key)
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Write([]byte(val))
+
+	return err
+}
+
+func (s *Server) sendToFollowers(ctx context.Context, msg *Message) error {
 	return nil
 }
