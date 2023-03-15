@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -55,7 +56,36 @@ func (s *Server) handleConn(conn net.Conn) {
 			log.Printf("conn read error: %s\n", err)
 			break
 		}
-		msg := buf[:n]
-		fmt.Println(string(msg))
+		go s.handleCommand(conn, buf[:n])
 	}
+}
+
+func (s *Server) handleCommand(conn net.Conn, rawCmd []byte) {
+	msg, err := s.parseMessage(rawCmd)
+	if err != nil {
+		fmt.Printf("failed to parse command %s : %s", string(rawCmd), err)
+		return
+	}
+
+	switch msg.Cmd {
+	case CMDSet:
+		if err := s.handleSetCommand(conn, msg); err != nil {
+			log.Printf("value not set [%s]\n", err)
+			return
+		}
+	}
+}
+
+func (s *Server) handleSetCommand(conn net.Conn, msg *Message) error {
+	if err := s.cache.Set(msg.Key, msg.Value, msg.TTL); err != nil {
+		return err
+	}
+
+	s.sendToFollowers(context.TODO(), msg)
+
+	return nil
+}
+
+func (s *Server) sendToFollowers(ctx context.Context, msg *Message ) error {
+	return nil
 }
